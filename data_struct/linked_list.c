@@ -43,7 +43,8 @@ void Insert(int data, int n) {
     return;
 }
 
-void Delete(int n) {
+void DeleteByValue(int n) { 
+    // n -> value
     if (head==NULL) {
         fprintf(stderr, "List empty for deletion\n");
         exit(EX_OSERR);
@@ -69,14 +70,41 @@ void Delete(int n) {
     return;
 }
 
+void Delete(int n) { 
+    // n -> position
+    if (head == NULL) {
+        fprintf(stderr, "List empty for deletion\n");
+        exit(EX_OSERR);
+    }
+    struct Node* current = head;
+    struct Node* next = head->next;
+    if (n < 1) return;
+    if (n == 1) {
+        head = next;
+        free(current);
+        return;
+        
+    }
+    int len = 0;
+    for (int i = 0; i < n-2 && next->next != NULL; i++) {
+        next = next->next;
+        current = current -> next;
+        len++;
+    }
+    if (n > len+2) return;
+    current->next = next->next;
+    free(next);
+    return;
+}
+
 void Reverse() {
     if(head == NULL) {
-        printf("List empty for reversal\n");
-        return;
+        fprintf(stderr, "List empty for deletion\n");
+        exit(EX_OSERR);
     }
-    struct Node *current, *prev, *next;
-    current = head;
-    prev = NULL;
+    struct Node *current = head;
+    struct Node *prev = NULL; 
+    struct Node *next;
     while(current != NULL) {
         next = current->next;
         current->next = prev;
@@ -87,19 +115,50 @@ void Reverse() {
     return;
 }
 
+void Flush() {
+    struct Node *current = head;
+    struct Node *next = head;
+    while(current != NULL) {
+        next = current->next;
+        free(current);
+        current = next;
+    }
+    return;
+}
+
 int main() {
-    Insert(21,1);
-    Insert(23,2);
-    Insert(25,3);
-    Insert(22,2);
-    Insert(24,3);
-    Print();
-    Delete(22);
-    Print();
-    Insert(22,1);
-    Print();
-    Reverse();
-    Print();
-    Delete(67);
-    return 0;
+    int opt, val, pos;
+    while(1) {
+        printf("select op:\n1. insert\n2. delete\n3. reverse\n4. flush\n5. print\n6. exit\n");
+        scanf("%d", &opt);
+        if (opt == 6) return 0;
+        if (opt == 1) {
+            printf("Enter value and position:\n");
+            scanf("%d %d", &val, &pos);
+            Insert(val, pos);
+            continue;
+        }
+        else if (opt == 2) {
+            printf("Enter position:\n");
+            scanf("%d", &pos);
+            Delete(pos);
+            continue;
+        }
+        else if (opt == 3) {
+            Reverse();
+            continue;
+        }
+        else if (opt == 4) {
+            Flush();
+            continue;
+        }
+        else if (opt == 5) {
+            Print();
+            continue;
+        }
+        else {
+            return 1;
+        }
+    }
+    return 1;
 }
