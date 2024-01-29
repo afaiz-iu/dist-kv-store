@@ -21,6 +21,22 @@
 #define PORT "4096"
 #define MAXRECVBYTES 40
 
+int sendFullBuffer(int sfd, char *buf, int *len) {
+    int total = 0;
+    int bleft = *len;
+    int t;
+    while (total < *len) {
+        // add partial send bytes to pointer
+        t = send(sfd, buf+total, bleft, 0);
+        if (t == -1) {break;}
+        total += t;
+        bleft -= t;
+    }
+    *len = total; // update number actually sent
+    return t == -1?1:0; // return 1 on failure 
+}
+
+
 int main(int argc, char *argv[]) {
     struct addrinfo hints, *results, *ptr;
     int sockfd, status, recv_bytes;
@@ -78,7 +94,7 @@ int main(int argc, char *argv[]) {
     size_t buffer_size;
     buffer_size = value_size + strlen(key) + 20; // 20 extra bytes for headers, newline, null
     char *msg_buffer = malloc(buffer_size);
-    // construct the message
+    // store k,v to buffer
     // set <key> <value-size-bytes> \r\n
     // <value> \r\n 
     sprintf(msg_buffer, "set %s %d\r\n%s\r\n", key, value_size, value);
@@ -87,7 +103,7 @@ int main(int argc, char *argv[]) {
     free(msg_buffer);
 
     // recieve from host
-    recv_bytes = recv(sockfd, recv_buffer, MAXRECVBYTES, 0);
+    recv_bytes = recv(sockfd, recv_buffer, MAXRECVBYTES-1, 0);
     printf("recv bytes: %d\n", recv_bytes);
     if (recv_bytes == -1) {
         perror("client: recv");
