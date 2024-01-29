@@ -28,10 +28,12 @@
 ** int getaddrinfo(const char *node, // IP
 ** const char *service, // port
 ** const struct addrinfo *hints, //pointer to addrinfo
-** struct addrinfo **res //pointer to linked list of addrinfo struct
+** struct addrinfo **res //pointer to linked list of addrinfo nodes
 ** );
 
 ** int socket(int domain, int type, int protocol); 
+
+** int bind(int sockfd, struct sockaddr *my_addr, int addrlen);
 */
 
 #include <stdio.h>
@@ -49,6 +51,7 @@
 
 #define PORT "4096"
 #define BACKLOG 8
+#define MAXVALUESIZE 4096
 
 // sigchild action to reap child process
 void sigaction_sigchld(int p) {
@@ -69,6 +72,21 @@ void *get_in_addr(struct sockaddr *sa)
     }
 
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+int sendFullBuffer(int sfd, char *buf, int *len) {
+    int total = 0;
+    int bleft = *len;
+    int t;
+    while (total < *len) {
+        // add partial send bytes to pointer
+        t = send(sfd, buf+total, bleft, 0);
+        if (t == -1) {break;}
+        total += t;
+        bleft -= t;
+    }
+    *len = total; // update number actually sent
+    return t == -1?1:0; // return 1 on failure 
 }
 
 // main
@@ -146,6 +164,7 @@ int main(void) {
     }
 
     printf("server: waiting...\n");
+    char recv_buffer[MAXVALUESIZE];
 
     //main accept loop
     while(1) {
@@ -160,6 +179,44 @@ int main(void) {
         sock_addr = (struct sockaddr *)&client_addr;
         inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), client_ip, sizeof(client_ip));
         printf("server: connected from %s\n", client_ip);
+
+        // code to recieve from client in a subprocess
+        // fork and pass client handler in child process
+        char r1[5];
+        char r2[2048];
+        int nb1, nb2;
+        if(!fork()) {
+            close(sockfd); //close sock fd in child
+            nb1 = recv(client_fd, &r1, 4, 0);
+            if (nb1 == -1) {
+                perror("recv:nb1");
+                exit(1);
+            }
+            r1[nb1] = '\0';
+            printf("r1:\n%s\n", r1);
+            nb2 = recv(client_fd, &r2, 2047, 0);
+            if (nb2 == -1) {
+                perror("recv:nb1");
+                exit(1);
+            }
+            r2[nb2] = '\0';
+            printf("r2:\n%s\n", r2);
+            // int numbytes;
+            // numbytes = recv(client_fd, &recv_buffer, MAXVALUESIZE-1, 0);
+            // if (numbytes == -1) {
+            //     perror("recv");
+            //     exit(1);
+            // }
+            // recv_buffer[numbytes] = '\0';
+            // printf("recived msg:\n%s", recv_buffer);
+
+            printf("sending ack..\n");
+            char *ack = "STORED\r\n";
+            send(client_fd, ack, strlen(ack), 0);
+            printf("ack sent\n");
+            close(client_fd);
+            exit(0);
+        }
         close(client_fd);
     }
 
