@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
+#include <pthread.h>
 
 #define PORT "4096"
 #define BACKLOG 8
@@ -75,7 +76,9 @@ int parse_body(int client_fd, char *buffer, int actual_size) {
     return 0;
 }
 
-int handle_client(int client_fd) {
+void *handle_client(void *client_fd_ptr) {
+    int client_fd = *((int*)client_fd_ptr);
+    free(client_fd_ptr);
     char recv_header[HEADERSIZE];
     int header_bytes;
     header_bytes = recv(client_fd, &recv_header, 34, 0);
@@ -91,14 +94,12 @@ int handle_client(int client_fd) {
         perror("recv: body");
         exit(1);
     }
-    printf("strlen:\n%zu\n", strlen(buffer));
-    printf("********************\n");
-    printf("%s\n", buffer);
+
     printf("sending ack..\n");
     char *ack = "STORED\r\n";
     send(client_fd, ack, strlen(ack), 0);
     printf("ack sent\n");     
-    return 0;
+    return NULL;
 }
 
 // main
@@ -183,9 +184,13 @@ int main(void) {
         printf("server: connected from %s\n", client_ip);
 
         // code to handle client_fd
-        // handle_client();
-        status = handle_client(client_fd);
-        close(client_fd);
+        // each client_fd is passed into a separate thread t
+        pthread_t t;
+        int *client_ptr = malloc(sizeof(int));
+        *client_ptr = client_fd;
+        pthread_create(&t, NULL, handle_client, client_ptr);
+        // status = handle_client(client_fd);
+        // close(client_fd);
     }
 
     return 0;
