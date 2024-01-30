@@ -36,6 +36,30 @@ int sendFullBuffer(int sfd, char *buf, int *len) {
     return t == -1?1:0; // return 1 on failure 
 }
 
+char* encode_msg(const char* key, const char* value, int value_size, int actual_size, char* msg_buffer) {
+    /*
+    ** message format
+    ** 8 Bytes for input value_size\r\n 
+    ** 8 Bytes for actual value size\r\n 
+    ** 12 Bytes for input key string\r\n 
+    ** actual value_size Bytes for value string + 8 padding \r\n\r\n
+    */    
+    int offset = 0;
+    offset += sprintf(msg_buffer, "%-8d\r\n", value_size); // user value size
+    offset += sprintf(msg_buffer+offset, "%-8d\r\n", actual_size); // value_size
+    offset += sprintf(msg_buffer+offset, "%-12s\r\n", key); // key 
+    memcpy(msg_buffer + offset, value, actual_size);
+    offset += actual_size;
+    // memset(msg_buffer + offset, ' ', value_size - actual_size); // pad remaining
+    // offset += value_size - actual_size;
+
+    msg_buffer[offset++] = '\r';
+    msg_buffer[offset++] = '\n';
+    msg_buffer[offset++] = '\r';
+    msg_buffer[offset++] = '\n';
+    msg_buffer[offset] = '\0';
+    return msg_buffer;
+}
 
 int main(int argc, char *argv[]) {
     struct addrinfo hints, *results, *ptr;
@@ -87,19 +111,24 @@ int main(int argc, char *argv[]) {
     char *key = argv[1];
     int value_size = atoi(argv[2]);
     char *value = argv[3];
-    if (value_size < (strlen(value) + 20)) {
+    int actual_size = strlen(value);
+    if (value_size < (actual_size + 10)) {
         fprintf(stderr, "usage: %s Insufficient value bytes passed\n", argv[1]);
         return 1;
     }
-    size_t buffer_size;
-    buffer_size = value_size + strlen(key) + 20; // 20 extra bytes for headers, newline, null
+    int buffer_size = 8 + 2 + 8 + 2 + 12 + 2 + actual_size + 8 + 4;
     char *msg_buffer = malloc(buffer_size);
-    // store k,v to buffer
-    // set <key> <value-size-bytes> \r\n
-    // <value> \r\n 
-    sprintf(msg_buffer, "set %s %d\r\n%s\r\n", key, value_size, value);
+    if (msg_buffer == NULL) {
+        perror("message buffer");
+        exit(1);
+    }
+    memset(msg_buffer, 0, buffer_size);
+    encode_msg(key, value, value_size, actual_size, msg_buffer);
+    // char *msg_buffer = encode_msg(key, value, value_size, user_value, buffer_size);
     printf("msg:\n%s", msg_buffer);
-    send(sockfd, msg_buffer, buffer_size, 0); // send message
+    printf("buffer size:%d\n", buffer_size);
+    sendFullBuffer(sockfd, msg_buffer, &buffer_size);
+    // send(sockfd, msg_buffer, buffer_size, 0); // send message
     free(msg_buffer);
 
     // recieve from host
@@ -113,7 +142,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "%d: connection closed by host", recv_bytes);
         return 1;
     }
-    recv_buffer[recv_bytes] = '\0'; // add eol 
+    recv_buffer[recv_bytes] = '\0'; // add null  
     printf("client: recieved %s", recv_buffer);
 
     return 0;
