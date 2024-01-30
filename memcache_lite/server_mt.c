@@ -15,10 +15,35 @@
 #include <arpa/inet.h>
 #include <sys/wait.h>
 #include <pthread.h>
+#include "threadqueue.h"
 
 #define PORT "4096"
-#define BACKLOG 8
+#define BACKLOG 200
 #define HEADERSIZE 40
+#define THREADPOOL 40
+
+// thread pool
+pthread_t t_pool[THREADPOOL];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void *thread_call(void *args);
+void *get_in_addr(struct sockaddr *sa);
+char *parse_header(char *recv_header, int *actual_size_ptr);
+int parse_body(int client_fd, char *buffer, int actual_size);
+void *handle_client(void *client_fd_ptr);
+
+void *thread_call(void *args) {
+    while(1) {
+        int *client_sock;
+        pthread_mutex_lock(&mutex);
+        client_sock = dequeue();
+        pthread_mutex_unlock(&mutex);
+        if (client_sock != NULL) {
+            // connection recieved. call handle_client()
+            handle_client(client_sock);
+        }
+    }
+}
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -111,7 +136,10 @@ int main(void) {
     socklen_t sin_size;
     int status;
     char client_ip[INET6_ADDRSTRLEN]; // IPv4(32 bit) or v6(128 bit)
-
+    // create threads
+    for (int i = 0; i < THREADPOOL; i++) {
+        pthread_create(&t_pool[i], NULL, thread_call, NULL);
+    }
     // set up addrinfo structs
     memset(&hints, 0, sizeof(hints)); // set memory block to 0
     hints.ai_family = AF_UNSPEC; // IPv4/v6
@@ -185,12 +213,13 @@ int main(void) {
 
         // code to handle client_fd
         // each client_fd is passed into a separate thread t
-        pthread_t t;
         int *client_ptr = malloc(sizeof(int));
         *client_ptr = client_fd;
-        pthread_create(&t, NULL, handle_client, client_ptr);
-        // status = handle_client(client_fd);
-        // close(client_fd);
+        // enqueue client fd - lock for shared queue
+        pthread_mutex_lock(&mutex);
+        enqueue(client_ptr);
+        pthread_mutex_unlock(&mutex);
+
     }
 
     return 0;
