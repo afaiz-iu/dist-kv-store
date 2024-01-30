@@ -39,10 +39,10 @@ int sendFullBuffer(int sfd, char *buf, int *len) {
 char* encode_msg(const char* key, const char* value, int value_size, int actual_size, char* msg_buffer) {
     /*
     ** message format
-    ** 8 Bytes for input value_size\r\n 
-    ** 8 Bytes for actual value size\r\n 
-    ** 12 Bytes for input key string\r\n 
-    ** actual value_size Bytes for value string + 8 padding \r\n\r\n
+    ** 8 Bytes for input value_size + 2 \r\n 
+    ** 8 Bytes for actual value size + 2 \r\n 
+    ** 12 Bytes for input key string + 2 \r\n 
+    ** actual value_size Bytes for value string + 4 \r\n\r\n
     */    
     int offset = 0;
     offset += sprintf(msg_buffer, "%-8d\r\n", value_size); // user value size
@@ -50,8 +50,6 @@ char* encode_msg(const char* key, const char* value, int value_size, int actual_
     offset += sprintf(msg_buffer+offset, "%-12s\r\n", key); // key 
     memcpy(msg_buffer + offset, value, actual_size);
     offset += actual_size;
-    // memset(msg_buffer + offset, ' ', value_size - actual_size); // pad remaining
-    // offset += value_size - actual_size;
 
     msg_buffer[offset++] = '\r';
     msg_buffer[offset++] = '\n';
@@ -124,11 +122,9 @@ int main(int argc, char *argv[]) {
     }
     memset(msg_buffer, 0, buffer_size);
     encode_msg(key, value, value_size, actual_size, msg_buffer);
-    // char *msg_buffer = encode_msg(key, value, value_size, user_value, buffer_size);
     printf("msg:\n%s", msg_buffer);
     printf("buffer size:%d\n", buffer_size);
     sendFullBuffer(sockfd, msg_buffer, &buffer_size);
-    // send(sockfd, msg_buffer, buffer_size, 0); // send message
     free(msg_buffer);
 
     // recieve from host
@@ -142,7 +138,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "%d: connection closed by host", recv_bytes);
         return 1;
     }
-    recv_buffer[recv_bytes] = '\0'; // add null  
+    recv_buffer[recv_bytes] = '\0'; // add null 
     printf("client: recieved %s", recv_buffer);
 
     return 0;
