@@ -21,6 +21,8 @@
 #define PORT "4096"
 #define MAXRECVBYTES 40
 
+int sendFullBuffer(int sfd, char *buf, int *len);
+
 int sendFullBuffer(int sfd, char *buf, int *len) {
     int total = 0;
     int bleft = *len;
@@ -65,6 +67,29 @@ int main(int argc, char *argv[]) {
     socklen_t sin_size;
     char recv_buffer[MAXRECVBYTES];
 
+    if (argc != 4) {
+        fprintf(stderr, "usage: %s <key> <value-size-bytes> <value>\n", argv[0]);
+        return 1;
+    }
+    char *key = argv[1];
+    int value_size = atoi(argv[2]);
+    char *value = argv[3];
+    int actual_size = strlen(value);
+    if (value_size < (actual_size + 10)) {
+        fprintf(stderr, "usage: %s Insufficient value bytes passed\n", argv[1]);
+        return 1;
+    }
+    int buffer_size = 8 + 2 + 8 + 2 + 12 + 2 + actual_size + 8 + 4;
+    char *msg_buffer = malloc(buffer_size);
+    if (msg_buffer == NULL) {
+        perror("message buffer");
+        exit(1);
+    }
+    memset(msg_buffer, 0, buffer_size);
+    encode_msg(key, value, value_size, actual_size, msg_buffer);
+    printf("msg:\n%s", msg_buffer);
+    printf("buffer size:%d\n", buffer_size);
+
     // set up structs
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -93,41 +118,16 @@ int main(int argc, char *argv[]) {
         }
         break;
     }
-
     if (ptr == NULL) {
-        // failed to connect
-        fprintf(stderr, "client: failed to connect\n");
+        fprintf(stderr, "client: failed to connect\n"); // failed to connect
         return 1;
     }
-
     freeaddrinfo(results);
 
-    if (argc != 4) {
-        fprintf(stderr, "usage: %s <key> <value-size-bytes> <value>\n", argv[0]);
-        return 1;
-    }
-    char *key = argv[1];
-    int value_size = atoi(argv[2]);
-    char *value = argv[3];
-    int actual_size = strlen(value);
-    if (value_size < (actual_size + 10)) {
-        fprintf(stderr, "usage: %s Insufficient value bytes passed\n", argv[1]);
-        return 1;
-    }
-    int buffer_size = 8 + 2 + 8 + 2 + 12 + 2 + actual_size + 8 + 4;
-    char *msg_buffer = malloc(buffer_size);
-    if (msg_buffer == NULL) {
-        perror("message buffer");
-        exit(1);
-    }
-    memset(msg_buffer, 0, buffer_size);
-    encode_msg(key, value, value_size, actual_size, msg_buffer);
-    printf("msg:\n%s", msg_buffer);
-    printf("buffer size:%d\n", buffer_size);
     sendFullBuffer(sockfd, msg_buffer, &buffer_size);
     free(msg_buffer);
 
-    // recieve from host
+    // recieve ack
     recv_bytes = recv(sockfd, recv_buffer, MAXRECVBYTES-1, 0);
     printf("recv bytes: %d\n", recv_bytes);
     if (recv_bytes == -1) {
