@@ -25,22 +25,26 @@
 // thread pool
 pthread_t t_pool[THREADPOOL];
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond_var = PTHREAD_COND_INITIALIZER;
 
-void *thread_call(void *args);
+void *set_value(void *args);
 void *get_in_addr(struct sockaddr *sa);
 char *parse_header(char *recv_header, int *actual_size_ptr);
 int parse_body(int client_fd, char *buffer, int actual_size);
 void *handle_client(void *client_fd_ptr);
 
-void *thread_call(void *args) {
+void *set_value(void *args) {
+    // waiting on condition var
     while(1) {
         int *client_sock;
         pthread_mutex_lock(&mutex);
-        client_sock = dequeue();
+        if ((client_sock = dequeue()) == NULL) { // check for empty queue
+            pthread_cond_wait(&cond_var, &mutex); // suspend thread release lock
+            client_sock = dequeue(); // connection recieved
+        }
         pthread_mutex_unlock(&mutex);
         if (client_sock != NULL) {
-            // connection recieved. call handle_client()
-            handle_client(client_sock);
+            handle_client(client_sock); // client handler for the thread
         }
     }
 }
@@ -55,8 +59,8 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
+// parse header and malloc actual value size
 char *parse_header(char *recv_header, int *actual_size_ptr) {
-    printf("header:\n%s\n", recv_header);
     char *token;
     token = strtok(recv_header, "\r\n");
     int value_size = atoi(token);
@@ -66,18 +70,17 @@ char *parse_header(char *recv_header, int *actual_size_ptr) {
     char key[13];
     strncpy(key, token, 12);
     key[12] = '\0';
-    printf("value:\t%d\nactual:\t%d\nkey:\t%s\n", value_size, actual_size, key);
     int buffer_size = actual_size + 13 + 8;
     char *buffer = malloc(buffer_size);
     if (!buffer) {
         perror("recv: malloc");
         exit(1);
     }
-    printf("malloc of actual size\nstarting address: %p\n", buffer);
     *actual_size_ptr = actual_size;
     return buffer;
 }
 
+// recv() until recv_bytes == actual value size
 int parse_body(int client_fd, char *buffer, int actual_size) {
     int recv_bytes = 0;
     int recv_size;
@@ -106,7 +109,7 @@ void *handle_client(void *client_fd_ptr) {
     free(client_fd_ptr);
     char recv_header[HEADERSIZE];
     int header_bytes;
-    header_bytes = recv(client_fd, &recv_header, 34, 0);
+    header_bytes = recv(client_fd, &recv_header, 34, 0); // read first 34 bytes header
     if (header_bytes == -1) {
         perror("recv:header_bytes");
         exit(1);
@@ -114,13 +117,15 @@ void *handle_client(void *client_fd_ptr) {
     int actual_size;
     recv_header[header_bytes] = '\0';
     char *buffer = parse_header(recv_header, &actual_size);
+    printf("header:\n%s\n", buffer);
     int rv;
     if ((rv = parse_body(client_fd, buffer, actual_size)) != 0) {
         perror("recv: body");
         exit(1);
     }
+    printf("body:\n%s\n", buffer);
+    printf("strlen:%zu\n", strlen(buffer));
 
-    printf("sending ack..\n");
     char *ack = "STORED\r\n";
     send(client_fd, ack, strlen(ack), 0);
     printf("ack sent\n");     
@@ -136,10 +141,13 @@ int main(void) {
     socklen_t sin_size;
     int status;
     char client_ip[INET6_ADDRSTRLEN]; // IPv4(32 bit) or v6(128 bit)
+    char recv_header[HEADERSIZE];
+
     // create threads
     for (int i = 0; i < THREADPOOL; i++) {
-        pthread_create(&t_pool[i], NULL, thread_call, NULL);
+        pthread_create(&t_pool[i], NULL, set_value, NULL);
     }
+
     // set up addrinfo structs
     memset(&hints, 0, sizeof(hints)); // set memory block to 0
     hints.ai_family = AF_UNSPEC; // IPv4/v6
@@ -179,21 +187,15 @@ int main(void) {
     }
 
     freeaddrinfo(results); // free addrinfo list
-
     if (ptr == NULL) {
-        // failed to bind to any
-        fprintf(stderr, "server:failed to bind\n");
+        fprintf(stderr, "server:failed to bind\n"); // failed to bind to any
         exit(1);
     }
-    
-    // listen to incoming client
-    int listen_status = listen(sockfd, BACKLOG);
+    int listen_status = listen(sockfd, BACKLOG); // listen to incoming client
     if (listen_status == -1) {
         perror("listen");
         exit(1);
     }
-    
-    char recv_header[HEADERSIZE];
 
     //main accept loop
     while(1) {
@@ -205,21 +207,19 @@ int main(void) {
             continue;
         }
 
-        // convert from network to preentation
+        // convert from network to presentation
         struct sockaddr *sock_addr;
         sock_addr = (struct sockaddr *)&client_addr;
         inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *)&client_addr), client_ip, sizeof(client_ip));
         printf("server: connected from %s\n", client_ip);
 
-        // code to handle client_fd
-        // each client_fd is passed into a separate thread t
         int *client_ptr = malloc(sizeof(int));
         *client_ptr = client_fd;
         // enqueue client fd - lock for shared queue
         pthread_mutex_lock(&mutex);
         enqueue(client_ptr);
+        pthread_cond_signal(&cond_var); // signal for incoming connection
         pthread_mutex_unlock(&mutex);
-
     }
 
     return 0;
