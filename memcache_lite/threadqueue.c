@@ -5,7 +5,7 @@ node_t *head = NULL;
 node_t *tail = NULL;
 
 void enqueue(int *client_fd) {
-    // enqueue to head of queue
+    // enqueue to tail of queue
     node_t *new_node = malloc(sizeof(node_t));
     new_node->client_fd = client_fd;
     new_node->next = NULL;
@@ -18,8 +18,9 @@ void enqueue(int *client_fd) {
 }
 
 int *dequeue() {
+    // dequeue from head of queue
     if (head == NULL) {
-        // return NULL when queue empty
+        // return NULL when empty
         return NULL;
     } else {
         int *fd = head->client_fd;
