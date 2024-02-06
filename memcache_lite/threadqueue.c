@@ -9,10 +9,10 @@ void enqueue(int *client_fd) {
     node_t *new_node = malloc(sizeof(node_t));
     new_node->client_fd = client_fd;
     new_node->next = NULL;
-    if (tail == NULL) { // empty 
-        head = new_node;
+    if (tail == NULL) { 
+        head = new_node; // empty 
     } else {
-        tail->next = new_node;
+        tail->next = new_node; // fifo
     }
     tail = new_node;
 }
