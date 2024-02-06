@@ -1,0 +1,24 @@
+client: recieved..
+VALUE A 20
+sdgjhgdgd
+END
+client: recieved..
+Error: key not found
+client: recieved..
+VALUE kk 40
+sdgnkfjbgkn
+END
+client: recieved..
+VALUE A 20
+sdgjhgdgd
+END
+client: recieved..
+Error: key not found
+client: recieved..
+VALUE kk 40
+sdgnkfjbgkn
+END
+client: recieved..
+VALUE E 20
+5544554455445544v
+END
