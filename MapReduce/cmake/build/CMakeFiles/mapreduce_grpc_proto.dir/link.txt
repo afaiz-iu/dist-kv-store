@@ -1,0 +1,2 @@
+/usr/bin/ar qc libmapreduce_grpc_proto.a CMakeFiles/mapreduce_grpc_proto.dir/mapreduce.grpc.pb.cc.o CMakeFiles/mapreduce_grpc_proto.dir/mapreduce.pb.cc.o
+/usr/bin/ranlib libmapreduce_grpc_proto.a
