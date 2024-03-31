@@ -1,5 +1,0 @@
-/home/cheng/faiz/distsys/distsys_sp24/MapReduce/cmake/build/CMakeFiles/mapreduce_grpc_proto.dir
-/home/cheng/faiz/distsys/distsys_sp24/MapReduce/cmake/build/CMakeFiles/server.dir
-/home/cheng/faiz/distsys/distsys_sp24/MapReduce/cmake/build/CMakeFiles/client.dir
-/home/cheng/faiz/distsys/distsys_sp24/MapReduce/cmake/build/CMakeFiles/edit_cache.dir
-/home/cheng/faiz/distsys/distsys_sp24/MapReduce/cmake/build/CMakeFiles/rebuild_cache.dir
