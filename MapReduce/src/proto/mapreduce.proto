@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package mapreduce;
+
+service ClusterService {
+    // initialize cluster with input number of mappers and reducers
+    rpc InitCluster(InitClusterRequest) returns (InitClusterResponse) {}
+}
+
+service JobService {
+    // submit a new job
+    rpc SubmitJob(SubmitJobRequest) returns (SubmitJobResponse) {}
+}
+
+message InitClusterRequest {
+    int32 num_mappers = 1;
+    int32 num_reducers = 2;
+}
+
+message InitClusterResponse {
+    int32 cluster_id=1;
+    bool ready=2;
+}
+
+message SubmitJobRequest {
+    int32 cluster_id = 1;
+    string input_file = 2;
+    string map_function = 3;
+    string reduce_function = 4;
+    string output_location = 5;
+}
+
+message SubmitJobResponse {
+    int32 job_id = 1;
+    bool submitted = 2;
+}
+
