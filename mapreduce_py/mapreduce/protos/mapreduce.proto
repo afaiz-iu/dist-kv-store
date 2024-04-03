@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package mapreduce;
+
+// init cluster with num_mappers and num_reducers and return UID 
+service ClusterService {
+    rpc InitCluster(InitClusterReq) returns (InitClusterResp) {}
+}
+
+// submit job with an associated cluster id and return uid for job
+service JobService {
+    rpc SubmitJob(SubmitJobReq) returns (SubmitJobResp) {}
+}
+
+// service for mapper workers
+// assign tasks and recv ack on task complete
+service MapperService {
+    rpc MapperTask(MapTask) returns (MapTaskAck) {}
+    rpc MapperOutput(MapOutput) returns (MapOutputAck) {}
+}
+
+// distributed barrier service 
+// recv ack on mapper complete
+// assign reducers basis key hash 
+service BarrierService {
+    rpc MapperOutputNotify(MapNotify) returns (MapNotifyAck) {}
+    rpc ReducerTask(ReduceTask) returns (ReduceTaskAck) {}
+}
+
+// service for reducer workers
+// notify on reduce complete
+service ReducerService {
+    rpc ReducerOutput(ReduceOutput) returns (ReduceOutputAck) {}
+}
+
+message InitClusterReq {
+    int32 num_mappers = 1;
+    int32 num_reducers = 2;
+}
+
+message InitClusterResp {
+    int64 cluster_id = 1;
+    bool ready = 2;
+}
+
+message SubmitJobReq {
+    int64 cluster_id = 1;
+    string input_file = 2;
+    string map_function = 3;
+    string reduce_function = 4;
+    string output_location = 5;
+}
+
+message SubmitJobResp {
+    int64 job_id = 1;
+    bool submitted = 2;
+}
+
+message MapTask {
+    int64 job_id = 1;
+    int32 mapper_id = 2;
+    string input_data_partition = 3;
+    string map_function = 4;
+}
+
+message MapTaskAck {
+    bool success = 1;
+}
+
+message MapOutput {
+    int64 job_id = 1;
+    int32 mapper_id = 2;
+    repeated KeyValue intermediate_results = 3;
+}
+
+message MapOutputAck {
+    bool success = 1;
+}
+
+message MapNotify {
+    int64 job_id = 1;
+    int32 mapper_id = 2;
+}
+
+message MapNotifyAck {
+    bool success = 1;
+}
+
+message ReduceTask {
+    int64 job_id = 1;
+    int32 reducer_id = 2;
+    repeated KeyValue intermediate_results = 3;
+    string reduce_function = 4;
+}
+
+message ReduceTaskAck {
+    bool success = 1;
+}
+
+message ReduceOutput {
+    int64 job_id = 1;
+    int32 reducer_id = 2;
+    repeated KeyValue final_results = 3;
+}
+
+message ReduceOutputAck {
+    bool success = 1;
+}
+
+message KeyValue {
+    string key = 1;
+    string value = 2;
+}
